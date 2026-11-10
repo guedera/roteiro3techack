@@ -24,6 +24,10 @@ sudo docker logs --tail 30 webgoat-lab
 
 No Burp, use **Proxy → Open browser** e acesse `http://127.0.0.1:8080/WebGoat`. O WebWolf, usado por algumas lições, fica em `http://127.0.0.1:9090/WebWolf`.
 
+**Porta do proxy:** o Burp costuma tentar usar `127.0.0.1:8080`, mas essa porta já pertence ao WebGoat. Se aparecer **Failed to start proxy service on 127.0.0.1:8080**, clique **Edit** no aviso e mude a porta do *proxy listener* para `8081`, mantendo o endereço de escuta em `127.0.0.1`. Salve e ative o listener. O endereço do WebGoat permanece `http://127.0.0.1:8080/WebGoat`.
+
+**Se o navegador integrado do Burp não abrir:** feche a janela de diagnóstico e use o Firefox da Kali. Em **Settings → General → Network Settings → Settings**, selecione **Manual proxy configuration** e configure **HTTP Proxy** como `127.0.0.1` e **Port** como `8081`. Esvazie **No proxy for**. Em `about:config`, defina `network.proxy.allow_hijacking_localhost` como `true`. Então acesse `http://127.0.0.1:8080/WebGoat` no Firefox. A requisição deve aparecer em **Proxy → Intercept** no Burp.
+
 ## 2. Confirmar a interceptação
 
 1. Em **Proxy → Intercept**, ative **Intercept is on**.

@@ -1,93 +1,110 @@
-# Relatório técnico — Roteiro 3: investigação web
+# Roteiro 3 — Investigação de segurança em aplicações web
 
-**Aluno:** [preencher]  
-**Data:** [preencher]
+**Disciplina:** Tecnologias Hackers — Insper
 
-> Substitua os campos entre colchetes por observações reais. Não conclua que há vulnerabilidade sem mostrar a requisição, a resposta e o acesso ou efeito indevido. Guarde os arquivos citados na pasta `evidencias/`.
+**Aluno:** [preencher]
 
-## 1. Ambiente
+**Data dos testes:** 10/11/2026
 
-- VM e sistema: [preencher]
-- Imagem Docker: `webgoat/webgoat:v2025.3` [confirmar]
-- Aplicação: `http://127.0.0.1:8080/WebGoat` [confirmar acesso]
-- Portas: 8080 e 9090 vinculadas a `127.0.0.1` [confirmar]
-- Burp Suite e navegador usados: [preencher]
-- Verificações de funcionamento e interceptação: [preencher; IDs das evidências]
+## 1. Ambiente e metodologia
 
-## 2. Método e organização das evidências
+O laboratório foi executado em uma máquina virtual Kali GNU/Linux Rolling 2026.2, com o OWASP WebGoat v2025.3 no contêiner Docker `webgoat-lab`. As portas 8080 (WebGoat) e 9090 (WebWolf) foram publicadas em `127.0.0.1`. O acesso ao WebGoat foi feito pelo Firefox, configurado para usar o Burp Suite Community Edition v2026.8 como proxy na porta 8081. O terminal registrou HTTP 302 para o caminho inicial, e o histórico do Burp confirmou que o fluxo chegou à tela de login com HTTP 200 (E01–E03).
 
-Descreva como cada teste foi preparado, qual condição mudou no Repeater e como as respostas foram comparadas. Identifique os pares de requisição/resposta por `E01`, `E02` etc. [preencher]
+No Burp, uma requisição inicial foi capturada em **Proxy → Intercept**, encaminhada e examinada em **HTTP history** junto com a resposta. O **Repeater** foi usado para comparar respostas ao remover o cookie, reutilizá-lo após logout e alterar o identificador de um perfil. A análise considerou os cabeçalhos, o corpo e os redirecionamentos, além do código HTTP.
 
-## 3. Comunicação HTTP
+## 2. Análise da comunicação HTTP
 
-| Campo | Requisição 1 | Requisição 2 |
+| Campo | Abertura da tela de login (E03) | Envio do cadastro (E04) |
 |---|---|---|
-| Funcionalidade | [preencher] | [preencher] |
-| Método e caminho | [preencher] | [preencher] |
-| Parâmetros e cabeçalhos relevantes | [preencher] | [preencher] |
-| Cookies | [preencher] | [preencher] |
-| Código e conteúdo da resposta | [preencher] | [preencher] |
-| Evidência (requisição e resposta) | [preencher] | [preencher] |
+| Método e caminho | `GET /WebGoat/login` | `POST /WebGoat/register.mvc` |
+| Parâmetros | Sem parâmetros na URL ou no corpo | `username`, `password`, `matchingPassword` e `agree` no corpo |
+| Cabeçalhos | `Host`, `User-Agent` e `Accept` | `Content-Type: application/x-www-form-urlencoded`, `Origin` e `Referer` |
+| Cookie enviado | `JSESSIONID` | `JSESSIONID` |
+| Resposta | HTTP 200, corpo HTML com a página de login | HTTP 302, `Location` para `/WebGoat/attack?username=teste1`, `Set-Cookie` e corpo vazio |
 
-**Comparação das finalidades:** [preencher]  
-**Dados fornecidos pelo cliente e decisões do servidor:** [preencher]  
-**Por que parâmetros e cabeçalhos do cliente não devem ser aceitos sem validação:** [preencher]
+O GET pede o HTML da tela. O POST envia dados para o servidor processar o cadastro. O cliente fornece o método, o caminho, os parâmetros e os cabeçalhos. O servidor decide se os dados são válidos, se deve criar uma sessão e qual resposta enviar. Como o cliente pode editar esses dados antes do envio, o servidor precisa validar tanto os valores recebidos quanto as permissões da identidade associada à sessão.
 
-## 4. Autenticação e sessão
+## 3. Autenticação e sessão
 
-**Registro e login da conta fictícia:** [preencher; não inclua a senha no relatório]  
-**Identificador de sessão antes do login:** [preencher]  
-**Identificador de sessão depois do login:** [preencher]  
-**Atributos dos cookies observados (`HttpOnly`, `Secure`, `SameSite`):** [preencher]  
-**O que a comparação indica sobre renovação de sessão e quais verificações adicionais seriam necessárias:** [preencher]
+Foi utilizada a conta fictícia `teste1`. A requisição do cadastro bem-sucedido já levava um `JSESSIONID`, e sua resposta definiu outro valor. A requisição autenticada ao recurso `/WebGoat/start.mvc?username=teste1` enviou o novo identificador e recebeu o HTML da aplicação (E04–E05). A troca reduz o risco de fixação de sessão, pois um identificador conhecido antes da autenticação não deve passar a dar acesso à sessão autenticada. A comparação documenta a troca durante o fluxo de cadastro com entrada automática. A renovação no POST de login separado ainda precisa de evidência própria, caso seja testada.
 
-| Condição no Repeater | Resultado esperado | Código e comportamento observado | Evidência (requisição e resposta) |
-|---|---|---|---|
-| Sessão autenticada original | [preencher] | [preencher] | [preencher] |
-| Identificador de sessão removido | [preencher] | [preencher] | [preencher] |
-| Após logout, identificador anterior | [preencher] | [preencher] | [preencher] |
+O `Set-Cookie` do cadastro apresenta `Path=/WebGoat` e `HttpOnly`. Os atributos `Secure` e `SameSite` não aparecem nesse cabeçalho. A captura foi feita em HTTP local.
 
-**Evidências de que a requisição foi processada em sessão autenticada:** [preencher]
+Com a sessão válida, o Repeater recebeu HTTP 200 com o HTML da área autenticada. Ao retirar o cookie, o mesmo caminho redirecionou para `/WebGoat/login`. Após logout, reenviar o identificador anterior também levou à tela de login (E05–E07). A comparação mostra que o parâmetro `username` sozinho não manteve o acesso e que o identificador anterior deixou de dar acesso ao recurso testado após o logout.
 
-## 5. Autorização
+## 4. Autorização e investigação aprofundada
 
-**Lição e recurso escolhidos:** [preencher]  
-**Regra de acesso do cenário:** [preencher]  
-**Identidades, permissões e recursos de cada uma:** [preencher]
+**Hipótese.** Na lição *Insecure Direct Object References* (IDOR), uma sessão com acesso ao perfil de Tom Cat poderia ler o perfil de outra identidade se o servidor aceitasse o ID fornecido na URL sem conferir a permissão sobre aquele perfil.
 
-Descreva o resultado dos testes de acesso permitido, sem autenticação, por outra identidade (se a lição permitir) e após alteração de um identificador ou parâmetro. Verifique o conteúdo da resposta e se a operação ocorreu. [preencher; IDs das evidências]
+**Método.** O perfil próprio retornou o ID `2342384` e o campo `role` no JSON (E08). A lição confirmou a rota alternativa com o ID do perfil próprio (E09). No Repeater, foi usado o caminho `GET /WebGoat/IDOR/profile/{userId}` com a sessão da lição. A tentativa com `2342385` retornou HTTP 200 com `lessonCompleted: false` e sem dados de perfil (E10). Em seguida, a requisição usou `2342388`, mantendo a sessão (E11).
 
-**Como a aplicação pode autenticar corretamente e ainda falhar na autorização, à luz dos resultados:** [preencher]
+**Resultado esperado.** O servidor deveria permitir a leitura do perfil próprio e impedir que Tom Cat recebesse os dados de Buffalo Bill sem permissão para aquele perfil.
 
-## 6. Matriz de testes
+**Resultado observado.** Para `2342388`, a resposta foi HTTP 200 com `lessonCompleted: true` e retornou o perfil de Buffalo Bill, incluindo nome, ID, papel e outros atributos. A comparação com E10 mostra por que o status 200 isolado não resolve o teste. A evidência da leitura indevida está no conteúdo da resposta E11.
 
-Inclua os testes de sessão e autorização já realizados. A coluna *Evidência* deve indicar **requisição e resposta salvas**. Adicione linhas conforme necessário.
+**Conclusão e recomendação.** A leitura do perfil alheio confirma uma falha de autorização por objeto no cenário da lição. Uma sessão válida estabelece a identidade do usuário, e o servidor ainda precisa verificar se ela tem permissão sobre o objeto solicitado. A correção é aplicar essa verificação no servidor a cada leitura ou alteração de perfil e restringir os campos retornados aos necessários para a operação.
 
-| Identidade / sessão | Recurso ou endpoint | Operação | Resultado esperado | Resultado observado | Evidência | Classificação |
-|---|---|---|---|---|---|---|
-| [usuário autorizado] | [preencher] | [operação permitida] | [preencher] | [preencher] | [E...] | [preencher] |
-| [usuário sem permissão] | [preencher] | [operação negada] | [preencher] | [preencher] | [E...] | [preencher] |
-| Sem autenticação | [preencher] | [preencher] | [preencher] | [preencher] | [E...] | [preencher] |
-| [identidade] | [recurso com parâmetro alterado] | [preencher] | [preencher] | [E...] | [preencher] |
+## 5. Matriz de testes
 
-Use apenas estas classificações: **comportamento esperado**, **configuração inadequada**, **vulnerabilidade confirmada** ou **resultado inconclusivo**.
+| Identidade ou sessão | Recurso e operação | Esperado | Observado | Evidência | Classificação |
+|---|---|---|---|---|---|
+| `teste1`, sessão válida | GET `/WebGoat/start.mvc?username=teste1` | Acesso permitido | 200 e HTML da área autenticada | E05 | Esperado |
+| Sem cookie | Mesmo GET | Exigir autenticação | 302 para o login | E06 | Esperado |
+| Cookie anterior, após logout | Mesmo GET | Negar o acesso com a sessão encerrada | 302 para o login | E07 | Esperado |
+| Tom Cat, sessão da lição | Leitura do próprio perfil | Acesso permitido | JSON do próprio perfil e confirmação da rota alternativa | E08, E09 | Esperado |
+| Tom Cat, sessão da lição | GET `/WebGoat/IDOR/profile/2342385` | Sem dados de perfil alheio | 200, tentativa rejeitada e sem dados de perfil | E10 | Sem exposição nesse teste |
+| Tom Cat, sessão da lição | GET `/WebGoat/IDOR/profile/2342388` | Negar a leitura do perfil alheio | 200 e dados do perfil de Buffalo Bill | E11 | Vulnerabilidade confirmada |
 
-## 7. Investigação aprofundada
+## 6. Pendências para a próxima revisão
 
-1. **Hipótese e motivo:** [preencher]
-2. **Metodologia:** requisição base, alteração planejada e condição de controle. [preencher]
-3. **Resultado esperado se o controle funcionar:** [preencher]
-4. **Resultado observado e evidências:** [preencher; IDs de requisição e resposta]
-5. **Relação entre a alteração e o comportamento:** [preencher]
-6. **Conclusão e classificação:** [preencher; indique limitações ou explicações alternativas]
-7. **Recomendação, se aplicável:** [preencher]
+- Testar o mesmo endpoint de perfil sem o cookie de sessão e registrar o resultado.
+- Verificar se a lição permite acessar o perfil de Buffalo Bill pela identidade autorizada. Se for possível, capturar a resposta para compará-la com E11.
+- Complementar a análise de renovação do cookie com a requisição e resposta do login separado, se disponíveis.
+- Salvar no Burp os pares de requisição e resposta usados na matriz e associá-los aos identificadores abaixo. Os anexos atuais são capturas de tela.
+- Preencher o nome do aluno. Para a demonstração prática, usar o Intercept e reproduzir a troca de ID no Repeater, explicando o conteúdo da resposta.
 
-## 8. Conclusões
+## 7. Evidências
 
-Resuma o que os testes demonstraram, quais resultados permaneceram inconclusivos e quais recomendações são sustentadas pelas evidências. [preencher]
+**E01 — Ambiente Kali e Docker**
 
-## 9. Índice das evidências
+![Ambiente Kali e Docker](evidencias/E01-ambiente.png)
 
-| ID | Arquivo da requisição | Arquivo da resposta | Teste ou conclusão sustentada |
-|---|---|---|---|
-| E01 | [preencher] | [preencher] | [preencher] |
+**E02 — Interceptação do GET inicial**
+
+![Interceptação do GET inicial](evidencias/E02-interceptacao.png)
+
+**E03 — Tela de login e resposta HTML**
+
+![Tela de login e resposta HTML](evidencias/E03-login.png)
+
+**E04 — Cadastro e emissão de novo cookie**
+
+![Cadastro e emissão de novo cookie](evidencias/E04-cadastro.png)
+
+**E05 — Sessão válida no Repeater**
+
+![Sessão válida no Repeater](evidencias/E05-sessao-valida.png)
+
+**E06 — Requisição sem cookie**
+
+![Requisição sem cookie](evidencias/E06-sem-cookie.png)
+
+**E07 — Reutilização do cookie após logout**
+
+![Reutilização do cookie após logout](evidencias/E07-apos-logout.png)
+
+**E08 — JSON do perfil próprio**
+
+![JSON do perfil próprio](evidencias/E08-perfil-proprio.png)
+
+**E09 — Confirmação da rota alternativa**
+
+![Confirmação da rota alternativa](evidencias/E09-rota-alternativa.png)
+
+**E10 — Tentativa com ID 2342385**
+
+![Tentativa com ID 2342385](evidencias/E10-id-invalido.png)
+
+**E11 — Leitura do perfil de Buffalo Bill**
+
+![Leitura do perfil de Buffalo Bill](evidencias/E11-perfil-alheio.png)

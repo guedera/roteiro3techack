@@ -34,7 +34,7 @@ mkdir -p evidencias
 
 ## 2. Interceptar e observar HTTP
 
-1. Abra o Burp Suite na Kali; use **Proxy → Open browser** e acesse `http://127.0.0.1:8080/WebGoat`.
+1. Abra o Burp Suite na Kali. Se o *proxy listener* não iniciar porque `127.0.0.1:8080` já está em uso, clique **Edit** no aviso, mude a porta do listener para `8081`, mantenha a escuta em `127.0.0.1`, salve e ative. Use **Proxy → Open browser** e acesse `http://127.0.0.1:8080/WebGoat`. Se o navegador do Burp não abrir, use o Firefox da Kali: em **Settings → General → Network Settings → Settings**, configure manualmente **HTTP Proxy** `127.0.0.1`, **Port** `8081`; esvazie **No proxy for**; em `about:config`, ponha `network.proxy.allow_hijacking_localhost` como `true`. A porta `8081` é do proxy; a `8080` continua sendo do WebGoat.
 2. Em **Proxy → Intercept**, ative a interceptação, recarregue a página e tire um print da requisição capturada. Clique **Forward**.
 3. Em **Proxy → HTTP history**, escolha **duas requisições de funcionalidades diferentes**. Para cada uma, abra as abas de requisição e resposta e salve o conteúdo bruto em `evidencias/` (opção **Save item** ou copiar/colar em arquivos `.txt`).
 
